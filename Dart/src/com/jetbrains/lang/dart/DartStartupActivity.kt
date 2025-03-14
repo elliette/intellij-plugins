@@ -1,9 +1,14 @@
 // Copyright 2000-2021 JetBrains s.r.o. Use of this source code is governed by the Apache 2.0 license that can be found in the LICENSE file.
 package com.jetbrains.lang.dart
 
+import com.intellij.openapi.application.edtWriteAction
 import com.intellij.openapi.application.readAction
 import com.intellij.openapi.application.readActionBlocking
-import com.intellij.openapi.application.edtWriteAction
+import com.intellij.openapi.editor.Editor
+import com.intellij.openapi.editor.event.CaretEvent
+import com.intellij.openapi.editor.event.CaretListener
+import com.intellij.openapi.fileEditor.FileDocumentManager
+import com.intellij.openapi.fileEditor.FileEditorManager
 import com.intellij.openapi.module.Module
 import com.intellij.openapi.module.ModuleManager
 import com.intellij.openapi.module.ModuleUtilCore
@@ -23,6 +28,12 @@ import com.jetbrains.lang.dart.sdk.DartSdk
 import com.jetbrains.lang.dart.sdk.DartSdkLibUtil
 import com.jetbrains.lang.dart.util.PubspecYamlUtil
 import kotlinx.coroutines.launch
+import com.intellij.openapi.components.ProjectComponent
+import com.intellij.openapi.fileEditor.FileEditorManagerEvent
+import com.intellij.openapi.fileEditor.FileEditorManagerListener
+import com.intellij.openapi.Disposable
+import com.intellij.openapi.util.Disposer
+
 
 /**
  * [DartStartupActivity] configures "Dart Packages" library (based on Dart-specific pubspec.yaml and .packages files) on a project open.
@@ -74,6 +85,16 @@ class DartStartupActivity : ProjectActivity {
     if (Registry.`is`("dart.launch.dtd.and.devtools", false)) {
       DartToolingDaemonService.getInstance(project).startService()
     }
+
+    println("set up active location changed notifications!!")
+    setUpActiveLocationChangeNotifications(project)
+  }
+
+  private fun setUpActiveLocationChangeNotifications(project: Project) {
+    val editor: Editor? = FileEditorManager.getInstance(project).selectedTextEditor
+    println("editor is $editor")
+    val locationChangeListener: CaretListener = LocationChangeListener()
+    editor?.getCaretModel()?.addCaretListener(locationChangeListener)
   }
 }
 
@@ -92,5 +113,21 @@ private fun prepareExcludeBuildAndToolCacheFolders(module: Module, pubspecYamlFi
 
   return {
     ModuleRootModificationUtil.updateExcludedFolders(module, contentRoot, emptyList(), urlsToExclude)
+  }
+}
+
+internal class LocationChangeListener : CaretListener {
+  override fun caretPositionChanged(event: CaretEvent) {
+    // Handle the cursor position change here.
+    val line = event.caret?.logicalPosition?.line
+    val column = event.caret?.logicalPosition?.column
+    val editor = event.editor
+    val virtualFile = FileDocumentManager.getInstance().getFile(editor.document)
+    if (virtualFile != null) {
+      val filePath = virtualFile.path
+      println("PATH IS $filePath")
+    }
+
+    println("Caret moved to line: $line, column: $column")
   }
 }
