@@ -16,6 +16,9 @@ import com.intellij.openapi.application.ReadAction
 import com.intellij.openapi.components.Service
 import com.intellij.openapi.components.service
 import com.intellij.openapi.diagnostic.logger
+import com.intellij.openapi.editor.Editor
+import com.intellij.openapi.editor.event.CaretListener
+import com.intellij.openapi.fileEditor.FileEditorManager
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.roots.ModuleRootManager
 import com.intellij.openapi.util.Key
@@ -32,6 +35,7 @@ import com.intellij.util.io.BaseOutputReader
 import com.intellij.util.io.URLUtil
 import com.jetbrains.lang.dart.analyzer.DartAnalysisServerService
 import com.jetbrains.lang.dart.ide.devtools.DartDevToolsService
+import com.jetbrains.lang.dart.ide.editor.DartActiveLocationChangedListener
 import com.jetbrains.lang.dart.sdk.DartSdk
 import com.jetbrains.lang.dart.sdk.DartSdkLibUtil
 import com.jetbrains.lang.dart.sdk.DartSdkUtil
@@ -97,6 +101,7 @@ class DartToolingDaemonService private constructor(private val project: Project)
     uri?.let {
       connectToDtdWebSocket(it)
       DartAnalysisServerService.getInstance(project).connectToDtd(uri)
+      registerActiveLocationChangedListener();
     }
   }
 
@@ -109,6 +114,12 @@ class DartToolingDaemonService private constructor(private val project: Project)
     catch (e: Exception) {
       logger.error("Failed to connect to Dart Tooling Daemon, uri: $uri", e)
     }
+  }
+
+  private fun registerActiveLocationChangedListener() {
+    val editor: Editor? = FileEditorManager.getInstance(project).selectedTextEditor
+    val locationChangedListener: CaretListener = DartActiveLocationChangedListener(project)
+    editor?.getCaretModel()?.addCaretListener(locationChangedListener)
   }
 
   @Suppress("unused") // for the Flutter plugin
